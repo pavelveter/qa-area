@@ -60,7 +60,9 @@ def test_config_and_attempt_flow(tmp_path, monkeypatch):
             ("testuser", "2024-01-01T00:00:00Z"),
         )
         conn.commit()
-        user_id = conn.execute("SELECT id FROM users WHERE github_username=?", ("testuser",)).fetchone()[0]
+        user_id = conn.execute(
+            "SELECT id FROM users WHERE github_username=?", ("testuser",)
+        ).fetchone()[0]
 
     # конфиг должен подхватить имя теста
     cfg = client.get("/api/config").json()

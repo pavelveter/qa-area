@@ -37,6 +37,17 @@ const state = {
   currentIndex: 0,
 }
 
+function getLimitLabel() {
+  if (state.user?.isLector) return '∞'
+  return state.config.attemptLimit
+}
+
+function updateLimitTexts() {
+  const label = getLimitLabel()
+  if (attemptLimitText) attemptLimitText.textContent = `${label} попытки`
+  if (attemptLimitHint) attemptLimitHint.textContent = label
+}
+
 const ACTIVE_ATTEMPT_KEY = 'quizActiveAttempt'
 
 const savedUser = localStorage.getItem('quizUser')
@@ -64,6 +75,7 @@ window.addEventListener('message', event => {
   localStorage.setItem('quizUser', JSON.stringify(payload))
   showStatus(`Привет, ${payload.username}!`, payload.attemptsLeft)
   updateAuthUI()
+  updateLimitTexts()
   refreshStatus()
   restoreActiveAttempt()
 })
@@ -76,9 +88,8 @@ async function loadConfig() {
     if (!res.ok) return
     const data = await res.json()
     state.config = data
-    attemptLimitText.textContent = `${data.attemptLimit} попытки`
     attemptMinutesText.textContent = `${data.attemptMinutes} минут`
-    attemptLimitHint.textContent = data.attemptLimit
+    updateLimitTexts()
     const titleSpan = document.getElementById("testName");
     if (titleSpan && data.name) {
       titleSpan.textContent = data.name;
@@ -108,6 +119,9 @@ async function refreshStatus() {
     if (res.ok) {
       const data = await res.json()
       state.user.attemptsLeft = data.attemptsLeft
+      if (typeof data.isLector !== 'undefined') {
+        state.user.isLector = data.isLector
+      }
       localStorage.setItem('quizUser', JSON.stringify(state.user))
       showStatus(`Привет, ${state.user.username}!`, data.attemptsLeft)
     } else if (res.status === 404) {
@@ -116,6 +130,7 @@ async function refreshStatus() {
     }
     startButton.disabled =
       !state.user || state.user.attemptsLeft <= 0 || !!state.attempt
+    updateLimitTexts()
   } catch (err) {
     console.error(err)
   }
@@ -150,7 +165,7 @@ async function startAttempt() {
     state.deadline = new Date(data.deadline)
     renderCurrentQuestion()
     renderTimer(state.deadline)
-    attemptBadge.textContent = `Попытка: ${data.attemptNumber} из ${state.config.attemptLimit}`
+    attemptBadge.textContent = `Попытка: ${data.attemptNumber} из ${getLimitLabel()}`
     submitButton.disabled = !state.questions.length
     startButton.disabled = true
     showPanels(true)
@@ -270,7 +285,10 @@ async function submitAttempt(auto) {
 
 function showStatus(text, attemptsLeft) {
   statusUser.textContent = text
-  statusAttempts.textContent = `Доступно попыток: ${attemptsLeft}`
+  const leftLabel =
+    state.user && state.user.isLector ? '∞' : attemptsLeft
+  statusAttempts.textContent = `Доступно попыток: ${leftLabel}`
+  updateLimitTexts()
 }
 
 function clearUser() {

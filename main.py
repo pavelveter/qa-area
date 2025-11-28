@@ -24,6 +24,8 @@ DB_PATH = QUESTIONS_PATH.with_suffix(".db")
 ATTEMPT_LIMIT = int(os.getenv("QUIZ_ATTEMPT_LIMIT", "3"))
 ATTEMPT_DURATION_SECONDS = int(os.getenv("QUIZ_ATTEMPT_MINUTES", "60")) * 60
 STATE_TTL_SECONDS = 600
+LECTOR = os.getenv("LECTOR", "").strip().lower()
+UNLIMITED_ATTEMPTS = 10**9
 
 GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID")
 GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET")
@@ -36,6 +38,16 @@ def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def is_lector(username: Optional[str]) -> bool:
+    return bool(username) and username.lower() == LECTOR
+
+
+def attempts_left(username: str, attempts_done: int) -> int:
+    if is_lector(username):
+        return UNLIMITED_ATTEMPTS
+    return max(0, ATTEMPT_LIMIT - attempts_done)
 
 
 def ensure_schema():
@@ -207,11 +219,13 @@ async def github_callback(code: str, state: str, request: Request):
             "SELECT COUNT(*) AS cnt FROM attempts WHERE user_id = ?", (user["id"],)
         ).fetchone()["cnt"]
 
-    attempts_left = max(0, ATTEMPT_LIMIT - attempts_done)
+    is_lector_flag = is_lector(user["username"])
+    attempts_left_value = attempts_left(user["username"], attempts_done)
     payload = {
         "userId": user["id"],
         "username": user["username"],
-        "attemptsLeft": attempts_left,
+        "attemptsLeft": attempts_left_value,
+        "isLector": is_lector_flag,
     }
 
     # Popup-friendly HTML sends data back to opener
@@ -254,7 +268,8 @@ def build_option_mapping_and_questions() -> Dict[str, Dict]:
 def start_attempt(payload: StartAttemptRequest):
     with get_db() as conn:
         user = conn.execute(
-            "SELECT id FROM users WHERE id = ?", (payload.userId,)
+            "SELECT id, github_username AS username FROM users WHERE id = ?",
+            (payload.userId,),
         ).fetchone()
         if user is None:
             raise HTTPException(status_code=404, detail="User not found")
@@ -262,7 +277,7 @@ def start_attempt(payload: StartAttemptRequest):
         attempts_done = conn.execute(
             "SELECT COUNT(*) AS cnt FROM attempts WHERE user_id = ?", (payload.userId,)
         ).fetchone()["cnt"]
-        if attempts_done >= ATTEMPT_LIMIT:
+        if not is_lector(user["username"]) and attempts_done >= ATTEMPT_LIMIT:
             raise HTTPException(status_code=403, detail="Attempt limit reached")
 
         attempt_number = attempts_done + 1
@@ -347,7 +362,12 @@ def submit_attempt(attempt_id: int, payload: SubmitAttemptRequest):
     now = datetime.now(timezone.utc)
     with get_db() as conn:
         attempt = conn.execute(
-            "SELECT * FROM attempts WHERE id = ? AND user_id = ?",
+            """
+            SELECT a.*, u.github_username AS username
+            FROM attempts a
+            JOIN users u ON u.id = a.user_id
+            WHERE a.id = ? AND a.user_id = ?
+            """,
             (attempt_id, payload.userId),
         ).fetchone()
         if attempt is None:
@@ -385,11 +405,11 @@ def submit_attempt(attempt_id: int, payload: SubmitAttemptRequest):
             "SELECT COUNT(*) AS cnt FROM attempts WHERE user_id = ?", (payload.userId,)
         ).fetchone()["cnt"]
 
-    attempts_left = max(0, ATTEMPT_LIMIT - attempts_done)
+    attempts_left_value = attempts_left(attempt["username"], attempts_done)
     return {
         "score": score,
         "total": total,
-        "attemptsLeft": attempts_left,
+        "attemptsLeft": attempts_left_value,
         "incorrect": incorrect_details,
     }
 
@@ -405,10 +425,10 @@ def root():
 @app.get("/api/attempts/status/{user_id}")
 def attempt_status(user_id: int):
     with get_db() as conn:
-        user_exists = conn.execute(
-            "SELECT 1 FROM users WHERE id = ?", (user_id,)
+        user_row = conn.execute(
+            "SELECT github_username AS username FROM users WHERE id = ?", (user_id,)
         ).fetchone()
-        if user_exists is None:
+        if user_row is None:
             raise HTTPException(status_code=404, detail="User not found")
 
         attempts = conn.execute(
@@ -419,9 +439,13 @@ def attempt_status(user_id: int):
             """,
             (user_id,),
         ).fetchall()
+
+    attempts_left_value = attempts_left(user_row["username"], len(attempts))
+    is_lector_flag = is_lector(user_row["username"])
     return {
         "attempts": [dict(row) for row in attempts],
-        "attemptsLeft": max(0, ATTEMPT_LIMIT - len(attempts)),
+        "attemptsLeft": attempts_left_value,
+        "isLector": is_lector_flag,
     }
 
 
