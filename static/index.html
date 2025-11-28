@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Veter's Quiz Arena</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <div class="bg-blur"></div>
+    <header class="hero" id="loginScreen">
+      <div class="hero__left">
+        <p class="eyebrow">QA Challenge</p>
+        <h1>
+          <span id="testName">Взломай тест</span> —
+          <span id="attemptLimitText">3 попытки</span>,<br />
+          <span id="attemptMinutesText">60 минут</span> на каждую
+        </h1>
+        <p class="lede">
+          Логин через GitHub и беги по вопросам, пока тикает таймер.
+        </p>
+      </div>
+      <div class="hero__right glass">
+        <div class="card__title">Пользователь</div>
+        <div class="oauth" id="oauthBlock">
+          <p class="hint" id="oauthHint" style="margin-bottom: 15px">
+            Жми кнопку и вернёшься сюда автоматически.
+          </p>
+          <button id="oauthButton" class="btn btn-primary" type="button">
+            Войти через GitHub
+          </button>
+        </div>
+        <button id="logoutButton" class="btn btn-ghost">Выйти</button>
+      </div>
+    </header>
+
+    <div id="quizScreen" class="hidden">
+      <div class="controlbar glass">
+        <div class="status">
+          <p id="statusUser">Не залогинен</p>
+          <p id="statusAttempts">Доступно попыток: —</p>
+        </div>
+        <div class="timer">
+          <p class="label">Обратный отсчёт</p>
+          <div id="timerDisplay">— : — : —</div>
+        </div>
+        <div class="hero__actions">
+          <button id="startButton" class="btn btn-primary" disabled>
+            Запустить попытку
+          </button>
+          <button id="resetButton" class="btn btn-ghost">
+            Сбросить ответы
+          </button>
+          <button id="logoutButtonTop" class="btn btn-ghost">Выйти</button>
+        </div>
+      </div>
+
+      <main class="layout">
+        <section class="panel glass hidden" id="questionsSection">
+          <div class="panel__header">
+            <div>
+              <p class="eyebrow">Вопросы</p>
+              <h2>Полёт через темы</h2>
+            </div>
+            <div class="header-badges">
+              <div id="attemptBadge" class="badge">Попытка: —</div>
+              <div id="questionProgress" class="badge">Вопрос: —</div>
+            </div>
+          </div>
+          <div id="questionsContainer" class="questions"></div>
+          <div class="actions">
+            <button id="submitButton" class="btn btn-primary" disabled>
+              Далее
+            </button>
+            <p class="hint">
+              Не тяни: время тикает. После
+              <span id="attemptLimitHint">3</span> попыток покажем все ошибочные
+              ответы.
+            </p>
+          </div>
+        </section>
+
+        <section class="panel glass hidden" id="resultsSection">
+          <div class="panel__header">
+            <div>
+              <p class="eyebrow">Результаты</p>
+              <h2>Обратная связь</h2>
+            </div>
+          </div>
+          <div id="results" class="results">
+            <p class="muted">Сначала залогинься и запусти попытку.</p>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <template id="questionTemplate">
+      <div class="question">
+        <div class="question__head">
+          <div class="question__topic"></div>
+          <div class="question__title"></div>
+        </div>
+        <div class="options"></div>
+      </div>
+    </template>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
